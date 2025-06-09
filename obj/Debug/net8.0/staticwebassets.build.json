@@ -1,0 +1,12 @@
+{
+  "Version": 1,
+  "Hash": "SdErSC1dr6vg56voSNguJBuMOn7IRtOpr5zZ8bqGacc=",
+  "Source": "connect4-backend",
+  "BasePath": "_content/connect4-backend",
+  "Mode": "Default",
+  "ManifestType": "Build",
+  "ReferencedProjectsConfiguration": [],
+  "DiscoveryPatterns": [],
+  "Assets": [],
+  "Endpoints": []
+}
