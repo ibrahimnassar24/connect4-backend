@@ -18,7 +18,8 @@ namespace connect4_backend.Extensions.Configurations
 );
 
 services.AddIdentityApiEndpoints<IdentityUser>()
-    .AddEntityFrameworkStores<AuthDbContext>();
+    .AddEntityFrameworkStores<AuthDbContext>()
+        .AddDefaultTokenProviders();
 
 
             return services;
