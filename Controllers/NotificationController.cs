@@ -7,6 +7,11 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using connect4_backend.Data;
 using connect4_backend.Data.Models;
+using Microsoft.AspNetCore.Authorization;
+using connect4_backend.Hubs;
+using System.Security.Claims;
+using Microsoft.AspNetCore.SignalR;
+using System.Text.Json;
 
 namespace connect4_backend.Controllers
 {
@@ -15,12 +20,32 @@ namespace connect4_backend.Controllers
     public class NotificationController : ControllerBase
     {
         private readonly Connect4Context _context;
+        private readonly IHubContext<Connect4Hub> _hub;
 
-        public NotificationController(Connect4Context context)
+        public NotificationController(
+            Connect4Context context,
+            IHubContext<Connect4Hub> hub)
         {
             _context = context;
+            _hub = hub;
         }
-
+        [HttpGet("test")]
+[Authorize]
+        public async Task<IActionResult> Test()
+        {
+            var notification = new Notification()
+            {
+                Id = 1,
+                Receiver = User.FindFirstValue(ClaimTypes.Email),
+                Message = "welcome to connect4 game",
+                Link = "don't concern yourself",
+                CreatedAt = new DateTime()
+            };
+            var id = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            var json = JsonSerializer.Serialize(notification);
+            await _hub.Clients.User(id).SendAsync("listening", json);
+            return Ok();
+}
         // GET: api/Notification
         [HttpGet]
         public async Task<ActionResult<IEnumerable<Notification>>> GetNotifications()

@@ -7,6 +7,15 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using connect4_backend.Data;
 using connect4_backend.Data.Models;
+using connect4_backend.Data.DTOs;
+using Microsoft.AspNetCore.Authorization;
+using NuGet.Common;
+using Microsoft.AspNetCore.SignalR;
+using connect4_backend.Hubs;
+using Microsoft.AspNetCore.Identity;
+using NuGet.Protocol.Plugins;
+using System.Security.Claims;
+using connect4_backend.Services;
 
 namespace connect4_backend.Controllers
 {
@@ -15,10 +24,23 @@ namespace connect4_backend.Controllers
     public class MatchController : ControllerBase
     {
         private readonly Connect4Context _context;
+        private readonly IHubContext<Connect4Hub> _hub;
+        private IConnect4GameManager _gameManager;
+        private readonly UserManager<IdentityUser> _userManager;
+        private readonly ILogger<MatchController> _logger;
 
-        public MatchController(Connect4Context context)
+        public MatchController(
+            Connect4Context context,
+            IHubContext<Connect4Hub> hub,
+            UserManager<IdentityUser> userManager,
+            ILogger<MatchController> logger,
+            IConnect4GameManager gameManager)
         {
             _context = context;
+            _hub = hub;
+            _userManager = userManager;
+            _gameManager = gameManager;
+            _logger = logger;
         }
 
         // GET: api/Match
@@ -76,13 +98,57 @@ namespace connect4_backend.Controllers
         // POST: api/Match
         // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
         [HttpPost]
-        public async Task<ActionResult<Match>> PostMatch(Match match)
+        [Authorize]
+        public async Task<ActionResult<Match>> PostMatch(MatchRequest matchRequest)
         {
+            var match = new Match()
+            {
+                FirstPlayer = matchRequest.firstPlayer,
+                SecondPlayer = matchRequest.secondPlayer,
+                Status = "PENDING",
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow
+            };
             _context.Matches.Add(match);
             await _context.SaveChangesAsync();
+            var secondPlayer = await _userManager.FindByEmailAsync(match.SecondPlayer);
+            var notification = Notification.CreateGameInvitation(match.FirstPlayer);
+            notification.Receiver = match.SecondPlayer;
+            notification.Link = $"{match.Id}";
+            var data = notification.ToJson();
+
+            await _hub.Clients.User(secondPlayer.Id).SendAsync("notification", data);
 
             return CreatedAtAction("GetMatch", new { id = match.Id }, match);
         }
+
+        [HttpGet("accept/{id}")]
+        public async Task<ActionResult<MatchDto>> AcceptMatch(int id)
+        {
+            var match = await _context.Matches.FindAsync(id);
+            match.Status = "ONGOING";
+            await _context.SaveChangesAsync();
+
+            var matchDto = new MatchDto(match);
+            matchDto.turn = matchDto.firstPlayer;
+            var data = matchDto.ToJson();
+            var firstPlayer = await _userManager.FindByEmailAsync(match.FirstPlayer);
+            var firstPlayerId = firstPlayer.Id;
+            var secondPlayerId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            await _hub.Clients.User(firstPlayerId).SendAsync("match", data);
+            var session = new GameSession()
+            {
+                GameId = match.Id,
+                FirstPlayerEmail = match.FirstPlayer,
+                FirstPlayerId = firstPlayerId,
+                SecondPlayerEmail = match.SecondPlayer,
+                SecondPlayerId = secondPlayerId,
+                Turn = match.FirstPlayer
+            };
+            _gameManager.AddGameSession(session);
+            return Ok(matchDto);
+        }
+
 
         // DELETE: api/Match/5
         [HttpDelete("{id}")]

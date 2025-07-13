@@ -8,6 +8,7 @@ using Microsoft.AspNetCore.Cors;
 using connect4_backend.Auth;
 using connect4_backend.Extensions.Configurations;
 using connect4_backend.Hubs;
+using connect4_backend.Services;
 
 
 var builder = WebApplication.CreateBuilder(args);
@@ -16,16 +17,18 @@ builder.WebHost.ConfigureKestrel(ops =>
 {
     ops.ListenAnyIP(5286);
 });
+builder.Logging.ClearProviders();
+builder.Logging.AddConsole();
 
 // Add services to the container.
-
-
-builder.Services.AddCorsConfig();
+builder.Services.AddSingleton<IConnect4GameManager, Connect4GameManager>();
+builder.Services.AddCorsConfig(builder.Configuration);
 builder.Services.AddControllers();
 builder.Services.AddAuthorization();
 builder.Services.AddIdentityConfig(builder.Configuration);
 builder.Services.AddDbConfig(builder.Configuration);
 builder.Services.AddSignalR();
+
 
 
 
@@ -52,7 +55,8 @@ app.UseAuthorization();
 
 app.MapControllers();
 
-app.MapHub<MatchHub>("/hub");
+app.MapHub<Connect4Hub>("/hub")
+.RequireAuthorization();
 
 app.MapPost("/logout", async (SignInManager<IdentityUser> signInManager,
     [FromBody] object empty) =>
