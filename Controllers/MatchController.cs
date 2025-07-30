@@ -1,21 +1,21 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Threading.Tasks;
-using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
-using connect4_backend.Data;
-using connect4_backend.Data.Models;
-using connect4_backend.Data.DTOs;
-using Microsoft.AspNetCore.Authorization;
-using NuGet.Common;
-using Microsoft.AspNetCore.SignalR;
-using connect4_backend.Hubs;
-using Microsoft.AspNetCore.Identity;
-using NuGet.Protocol.Plugins;
 using System.Security.Claims;
+using System.Threading.Tasks;
+using connect4_backend.Data;
+using connect4_backend.Data.DTOs;
+using connect4_backend.Data.Models;
+using connect4_backend.Hubs;
 using connect4_backend.Services;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.SignalR;
+using Microsoft.EntityFrameworkCore;
+using NuGet.Common;
+using NuGet.Protocol.Plugins;
 
 namespace connect4_backend.Controllers
 {
@@ -24,151 +24,116 @@ namespace connect4_backend.Controllers
     public class MatchController : ControllerBase
     {
         private readonly Connect4Context _context;
-        private readonly IHubContext<Connect4Hub> _hub;
+        private readonly IConnect4InvitationManager _invitationManager;
         private IConnect4GameManager _gameManager;
+        private readonly IGameHub _hub;
         private readonly UserManager<IdentityUser> _userManager;
-        private readonly ILogger<MatchController> _logger;
 
         public MatchController(
             Connect4Context context,
-            IHubContext<Connect4Hub> hub,
+            IGameHub gameHub,
             UserManager<IdentityUser> userManager,
-            ILogger<MatchController> logger,
-            IConnect4GameManager gameManager)
+            IConnect4GameManager gameManager,
+            IConnect4InvitationManager invitationManager)
         {
             _context = context;
-            _hub = hub;
+            _hub = gameHub;
             _userManager = userManager;
             _gameManager = gameManager;
-            _logger = logger;
+            _invitationManager = invitationManager;
         }
 
-        // GET: api/Match
-        [HttpGet]
-        public async Task<ActionResult<IEnumerable<Match>>> GetMatches()
-        {
-            return await _context.Matches.ToListAsync();
-        }
 
-        // GET: api/Match/5
-        [HttpGet("{id}")]
-        public async Task<ActionResult<Match>> GetMatch(int id)
-        {
-            var match = await _context.Matches.FindAsync(id);
-
-            if (match == null)
-            {
-                return NotFound();
-            }
-
-            return match;
-        }
-
-        // PUT: api/Match/5
-        // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
-        [HttpPut("{id}")]
-        public async Task<IActionResult> PutMatch(int id, Match match)
-        {
-            if (id != match.Id)
-            {
-                return BadRequest();
-            }
-
-            _context.Entry(match).State = EntityState.Modified;
-
-            try
-            {
-                await _context.SaveChangesAsync();
-            }
-            catch (DbUpdateConcurrencyException)
-            {
-                if (!MatchExists(id))
-                {
-                    return NotFound();
-                }
-                else
-                {
-                    throw;
-                }
-            }
-
-            return NoContent();
-        }
-
-        // POST: api/Match
-        // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
-        [HttpPost]
+        // post api/match/invite/some@example.com
+        [HttpPost("invite")]
         [Authorize]
-        public async Task<ActionResult<Match>> PostMatch(MatchRequest matchRequest)
+        public async Task<IActionResult> CreateInvitation(InvitationRequest invitationRequest)
         {
-            var match = new Match()
+            // create an invitation with the current user as the sender
+            // and the received email as the receiver
+
+            var sender = User.FindFirstValue(ClaimTypes.Email);
+            var email = invitationRequest.email;
+            var invitation = _invitationManager.Create(sender, email);
+            if (invitation is null)
+                return BadRequest();
+
+            // send notification to the receiver
+            await _hub.SendInvitationNotification(invitation);
+
+            return Ok(new
             {
-                FirstPlayer = matchRequest.firstPlayer,
-                SecondPlayer = matchRequest.secondPlayer,
-                Status = "PENDING",
-                CreatedAt = DateTime.UtcNow,
-                UpdatedAt = DateTime.UtcNow
-            };
+                invitationId = invitation.invitationId
+            });
+        }
+
+        [HttpPut("accept/{id}")]
+        [Authorize]
+        public async Task<IActionResult> Accept(string id)
+        {
+            // check if the invitation exists and is not expired
+            var invitation = _invitationManager.Get(id);
+            if (invitation is null)
+                return NotFound();
+
+            if (invitation.HasExpired())
+            {
+                _invitationManager.Remove(invitation);
+                return BadRequest("invitation has expired");
+            }
+
+            // create the match and save it to database
+            var match = new Match();
+            match.FirstPlayer = invitation.senderEmail;
+            match.SecondPlayer = invitation.receiverEmail;
+            match.CreatedAt = DateTime.UtcNow;
+            match.UpdatedAt = DateTime.UtcNow;
+            match.Status = "ONGOING";
+
             _context.Matches.Add(match);
             await _context.SaveChangesAsync();
-            var secondPlayer = await _userManager.FindByEmailAsync(match.SecondPlayer);
-            var notification = Notification.CreateGameInvitation(match.FirstPlayer);
-            notification.Receiver = match.SecondPlayer;
-            notification.Link = $"{match.Id}";
-            var data = notification.ToJson();
 
-            await _hub.Clients.User(secondPlayer.Id).SendAsync("notification", data);
+            // create the transfer data object
+            var dto = new MatchDto(match);
+            dto.invitationId = id;
 
-            return CreatedAtAction("GetMatch", new { id = match.Id }, match);
-        }
+            // create gamesession for the match.
+            var gameSession = _gameManager.CreateGameSession(dto);
 
-        [HttpGet("accept/{id}")]
-        public async Task<ActionResult<MatchDto>> AcceptMatch(int id)
-        {
-            var match = await _context.Matches.FindAsync(id);
-            match.Status = "ONGOING";
-            await _context.SaveChangesAsync();
+            // notify the invitation sender about match details.
+            await _hub.SendInvitationAcceptanceNotification(dto);
 
-            var matchDto = new MatchDto(match);
-            matchDto.turn = matchDto.firstPlayer;
-            var data = matchDto.ToJson();
-            var firstPlayer = await _userManager.FindByEmailAsync(match.FirstPlayer);
-            var firstPlayerId = firstPlayer.Id;
-            var secondPlayerId = User.FindFirstValue(ClaimTypes.NameIdentifier);
-            await _hub.Clients.User(firstPlayerId).SendAsync("match", data);
-            var session = new GameSession()
-            {
-                GameId = match.Id,
-                FirstPlayerEmail = match.FirstPlayer,
-                FirstPlayerId = firstPlayerId,
-                SecondPlayerEmail = match.SecondPlayer,
-                SecondPlayerId = secondPlayerId,
-                Turn = match.FirstPlayer
-            };
-            _gameManager.AddGameSession(session);
-            return Ok(matchDto);
+            // return the match details to the invitation receiver
+            return Ok(dto);
         }
 
 
-        // DELETE: api/Match/5
-        [HttpDelete("{id}")]
-        public async Task<IActionResult> DeleteMatch(int id)
+        [HttpDelete("decline/{id}")]
+        [Authorize]
+        public async Task<IActionResult> Decline(string id)
         {
-            var match = await _context.Matches.FindAsync(id);
-            if (match == null)
-            {
-                return NotFound();
-            }
+            var invitation = _invitationManager.Get(id);
+            if (invitation is null)
+                return NoContent();
 
-            _context.Matches.Remove(match);
-            await _context.SaveChangesAsync();
-
+            await _hub.DeclineInvitation(invitation);
+            _invitationManager.Remove(invitation);
             return NoContent();
         }
 
-        private bool MatchExists(int id)
+        [HttpDelete("withdraw/{id}")]
+        [Authorize]
+        public IActionResult Withdraw(string id)
         {
-            return _context.Matches.Any(e => e.Id == id);
+            var invitation = _invitationManager.Get(id);
+            if (invitation is null)
+                return NotFound();
+
+            var removed = _invitationManager.Remove(invitation);
+            if (removed)
+                return NoContent();
+
+            return BadRequest();
         }
     }
 }

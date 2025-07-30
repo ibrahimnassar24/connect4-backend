@@ -29,6 +29,7 @@ public class MatchDto
     public DateTime createdAt { get; set; }
     public DateTime updatedAt { get; set; }
     public string status { get; set; } = null!;
+    public string invitationId { get; set; }
     public string? turn { get; set; } = null;
     public string ToJson()
     {

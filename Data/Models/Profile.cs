@@ -15,6 +15,8 @@ public partial class Profile
 
     public string? AvatarUrl { get; set; }
 
+    public string? CoverUrl { get; set; }
+
     public DateTime CreatedAt { get; set; }
 
     public DateTime UpdatedAt { get; set; }

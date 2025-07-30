@@ -7,5 +7,6 @@ public interface IConnect4GameManager
     void AddGameSession(GameSession gameSession);
     bool RemoveGameSession(int id);
     GameSession? GetGameSession(int id);
+    Task<GameSession> CreateGameSession(MatchDto match);
     bool GameSessionExists(int id);
 }

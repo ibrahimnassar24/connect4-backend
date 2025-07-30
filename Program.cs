@@ -17,19 +17,17 @@ builder.WebHost.ConfigureKestrel(ops =>
 {
     ops.ListenAnyIP(5286);
 });
-builder.Logging.ClearProviders();
-builder.Logging.AddConsole();
+
+var configuration = builder.Configuration;
 
 // Add services to the container.
-builder.Services.AddSingleton<IConnect4GameManager, Connect4GameManager>();
-builder.Services.AddCorsConfig(builder.Configuration);
+builder.Services.AddConnect4Config(configuration);
+builder.Services.AddCorsConfig(configuration);
 builder.Services.AddControllers();
 builder.Services.AddAuthorization();
 builder.Services.AddIdentityConfig(builder.Configuration);
 builder.Services.AddDbConfig(builder.Configuration);
 builder.Services.AddSignalR();
-
-
 
 
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
@@ -54,6 +52,7 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
+app.UseStaticFiles();
 
 app.MapHub<Connect4Hub>("/hub")
 .RequireAuthorization();

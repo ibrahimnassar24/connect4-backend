@@ -145,6 +145,9 @@ public partial class Connect4Context : DbContext
             entity.Property(e => e.AvatarUrl)
                 .IsUnicode(false)
                 .HasColumnName("avatarUrl");
+            entity.Property(e => e.CoverUrl)
+            .IsUnicode(false)
+            .HasColumnName("coverUrl");
             entity.Property(e => e.Bio).HasColumnName("bio");
             entity.Property(e => e.CreatedAt).HasColumnName("createdAt");
             entity.Property(e => e.FirstName)
@@ -156,8 +159,7 @@ public partial class Connect4Context : DbContext
             entity.Property(e => e.UpdatedAt).HasColumnName("updatedAt");
         });
 
-        OnModelCreatingPartial(modelBuilder);
     }
 
-    partial void OnModelCreatingPartial(ModelBuilder modelBuilder);
+    
 }
