@@ -27,7 +27,7 @@ public class SharedService : ISharedService
         : null;
     }
 
-    public async Task MarkMatchAsFinished(int id, string winner)
+    public async Task MarkMatchAsFinished(string id, string winner)
     {
         using var scope = _serviceProvider.CreateScope();
         var ctx = scope.ServiceProvider.GetRequiredService<Connect4Context>();
@@ -39,6 +39,7 @@ public class SharedService : ISharedService
 
         match.Winner = winner;
         match.Status = "FINISHED";
+        match.UpdatedAt = DateTime.UtcNow;
         await ctx.SaveChangesAsync();
     }
 }

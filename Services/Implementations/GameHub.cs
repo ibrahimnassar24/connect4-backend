@@ -29,7 +29,6 @@ public class GameHub : IGameHub
     public async Task SendInvitationNotification(Invitation invitation)
     {
         // get the id of the receiver
-        // by retrieving the user object for the receiver
         var receiverId = await _sharedService.GetUserId(invitation.receiverEmail);
 
         if (receiverId is null)
@@ -57,56 +56,117 @@ public class GameHub : IGameHub
             .SendAsync("notification", data);
     }
 
-    public async Task SendInvitationAcceptanceNotification(MatchDto match)
+    public async Task SendInvitationAcceptanceNotification(string userEmail, string invitationId, string matchId)
     {
         // get user id.
-        var id = await _sharedService.GetUserId(match.firstPlayer);
+        var id = await _sharedService.GetUserId(userEmail);
         if (id is null)
             return;
 
         // create the payload
-            var data = JsonSerializer.Serialize(match);
+        var payloadObj = new
+        {
+            matchId = matchId
+        };
+        var payload = JsonSerializer.Serialize(payloadObj);
+        var notification = NotificationDto.CreateInvitationAcceptance(payload);
+        var data = notification.ToJson();
 
         await _hub.Clients.User(id)
-        .SendAsync("match", data);
+        .SendAsync("invitation", invitationId, data);
     }
 
     public async Task DeclineInvitation(Invitation invitation)
     {
         var id = await _sharedService.GetUserId(invitation.senderEmail);
-
+        if (id is null)
+            return;
+        var notification = NotificationDto.CreateInvitationDecline("");
+        var data = notification.ToJson();
         await _hub.Clients.User(id)
-        .SendAsync("cancel", invitation.invitationId);
+            .SendAsync("invitation", invitation.invitationId, data);
     }
 
-    public async Task SendMovement(Movement movement, string userId)
+    public async Task StartMatch(string connectionId, string matchId, MatchDto match)
     {
-        var data = movement.ToJson();
-        await _hub.Clients.User(userId).SendAsync("movement", data);
+        var payload = JsonSerializer.Serialize(match);
+        var notification = NotificationDto.CreateStartMatchNotification(payload);
+        var data = notification.ToJson();
+
+        await _hub.Clients.Client(connectionId).SendAsync("match", matchId, data);
+
     }
 
-    public async Task ChangeTurn(string turn, string id)
+    public async Task SendMovement(string connectionId, string matchId, Movement movement)
     {
-        await _hub.Clients.User(id).SendAsync("changeTurn", turn);
+        var notification = NotificationDto.CreateAddMovementNotification(movement);
+        var data = notification.ToJson();
+        await _hub.Clients.Client(connectionId).SendAsync("match", matchId, data);
     }
 
-    public async Task EndMatch(GameSession session)
+    public async Task SendSwitchTurnNotification(string connectionId, string matchId, string turn)
     {
-        var winnerId = await _sharedService.GetUserId(session.Winner);
-
-        if (winnerId == session.FirstPlayerId)
+        var payloadObj = new
         {
-            await _hub.Clients.User(session.FirstPlayerId).SendAsync("gameWon");
-            await _hub.Clients.User(session.SecondPlayerId).SendAsync("gameOver");
-        }
-        else if( winnerId == session.SecondPlayerId)
-        {
-            await _hub.Clients.User(session.SecondPlayerId).SendAsync("gameWon");
-            await _hub.Clients.User(session.FirstPlayerId).SendAsync("gameOver");
-        }
+            turn = turn
+        };
+        var payloadData = JsonSerializer.Serialize(payloadObj);
+        var notification = NotificationDto.CreateSwitchturnNotification(payloadData);
+        var data = notification.ToJson();
+        await _hub.Clients.Client(connectionId).SendAsync("match", matchId, data);
     }
 
-    
+    public async Task SendMatchWonNotification(string connectionId, string matchId)
+    {
+        var notification = NotificationDto.CreateMatchWonNotification();
+        var data = notification.ToJson();
+        await _hub.Clients.Client(connectionId).SendAsync("match", matchId, data);
+    }
+
+    public async Task SendMatchLostNotification(string connectionId, string matchId)
+    {
+        var notification = NotificationDto.CreateMatchLostNotification();
+        var data = notification.ToJson();
+        await _hub.Clients.Client(connectionId).SendAsync("match", matchId, data);
+    }
+
+    public async Task SendMatchForfittedNotification(string connectionId, string matchId)
+    {
+        var notification = NotificationDto.CreateMatchForfittedNotification();
+        var data = notification.ToJson();
+
+        await _hub.Clients.Client(connectionId).SendAsync("match", matchId, data);
+    }
+
+    public async Task SendMatchErrorNotification(string connectionId, string matchId, string message)
+    {
+        var payloadObj = new
+        {
+            msg = message
+        };
+        var payloadData = JsonSerializer.Serialize(payloadObj);
+        var notification = NotificationDto.CreateMatchErrorNotification(payloadData);
+        var data = notification.ToJson();
+
+        await _hub.Clients.Client(connectionId).SendAsync("match", matchId, data);
+    }
+
+
+    public async Task SendMatchWarningNotification(string connectionId, string matchId, string message)
+    {
+        var payloadObj = new
+        {
+            msg = message
+        };
+        var payloadData = JsonSerializer.Serialize(payloadObj);
+        var notification = NotificationDto.CreateMatchWarningNotification(payloadData);
+        var data = notification.ToJson();
+
+        await _hub.Clients.Client(connectionId).SendAsync("match", matchId, data);
+    }
+
+
+
     private async Task<string?> GetUserFullName(string email)
     {
         using var scope = _serviceProvider.CreateScope();

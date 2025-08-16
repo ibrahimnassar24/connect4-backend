@@ -9,7 +9,9 @@ namespace connect4_backend.Data.DTOs;
 public class MatchDto
 {
     public MatchDto()
-    {}
+    {
+        id = Guid.NewGuid().ToString();
+    }
 
     public MatchDto(Match match)
     {
@@ -20,9 +22,10 @@ public class MatchDto
         this.createdAt = match.CreatedAt;
         this.updatedAt = match.UpdatedAt;
         this.winner = match.Winner;
+        this.turn = match.FirstPlayer;
     }
 
-    public int id { get; set; }
+    public string id { get; set; }
     public string firstPlayer { get; set; } = null!;
     public string secondPlayer { get; set; } = null!;
     public string? winner { get; set; }

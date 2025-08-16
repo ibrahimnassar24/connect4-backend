@@ -17,10 +17,7 @@ namespace connect4_backend.Extensions.Configurations
                                       .AllowAnyHeader());
             });
 
-            services.ConfigureApplicationCookie(options =>
-            {
-                options.Cookie.SameSite = SameSiteMode.Lax; // Set SameSite to Lax for cookies
-            });
+
 
             return services;
         }

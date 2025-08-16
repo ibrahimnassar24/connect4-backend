@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.SqlServer;
 using Microsoft.AspNetCore.Cors;
+using Microsoft.AspNetCore.Authentication.Google;
 using connect4_backend.Auth;
 using connect4_backend.Extensions.Configurations;
 using connect4_backend.Hubs;
@@ -13,19 +14,22 @@ using connect4_backend.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.WebHost.ConfigureKestrel(ops =>
-{
-    ops.ListenAnyIP(5286);
-});
+// builder.WebHost.ConfigureKestrel(ops =>
+// {
+//     ops.ListenAnyIP(5286);
+// });
 
 var configuration = builder.Configuration;
 
 // Add services to the container.
+
 builder.Services.AddConnect4Config(configuration);
 builder.Services.AddCorsConfig(configuration);
 builder.Services.AddControllers();
-builder.Services.AddAuthorization();
 builder.Services.AddIdentityConfig(builder.Configuration);
+builder.Services.AddCookieConfig();
+builder.Services.AddGoogleAuthConfig(configuration);
+builder.Services.AddAuthorization();
 builder.Services.AddDbConfig(builder.Configuration);
 builder.Services.AddSignalR();
 
@@ -36,6 +40,29 @@ builder.Services.AddSwaggerGen();
 
 var app = builder.Build();
 
+app.Use(async (context, next) =>
+{
+    // Log the request path
+    Console.WriteLine($"\nRequest Path: {context.Request.Path}");
+
+    // Log the cookies
+    Console.WriteLine("Query:");
+    if (context.Request.Query.Count > 0)
+    {
+        foreach (var query in context.Request.Query)
+        {
+            // Console.WriteLine($"- {query.Key}: {query.Value}");
+        }
+    }
+    else
+    {
+        Console.WriteLine("  No query parameters found.");
+    }
+
+    // Call the next middleware in the pipeline
+    await next(context);
+});
+
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
@@ -43,13 +70,13 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
+
 app.UseCors("AllowAllOrigins");
+app.UseAuthentication();
+app.UseAuthorization();
 app.MapIdentityApi<IdentityUser>();
 
 app.UseHttpsRedirection();
-
-app.UseAuthentication();
-app.UseAuthorization();
 
 app.MapControllers();
 app.UseStaticFiles();

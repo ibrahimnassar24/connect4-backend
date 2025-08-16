@@ -84,6 +84,7 @@ namespace connect4_backend.Controllers
 
             // create the match and save it to database
             var match = new Match();
+            match.Id = Guid.NewGuid().ToString();
             match.FirstPlayer = invitation.senderEmail;
             match.SecondPlayer = invitation.receiverEmail;
             match.CreatedAt = DateTime.UtcNow;
@@ -101,10 +102,10 @@ namespace connect4_backend.Controllers
             var gameSession = _gameManager.CreateGameSession(dto);
 
             // notify the invitation sender about match details.
-            await _hub.SendInvitationAcceptanceNotification(dto);
+            await _hub.SendInvitationAcceptanceNotification(match.FirstPlayer, invitation.invitationId, match.Id);
 
             // return the match details to the invitation receiver
-            return Ok(dto);
+            return Ok(new { matchId = dto.id});
         }
 
 

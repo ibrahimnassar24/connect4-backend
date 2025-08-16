@@ -5,7 +5,7 @@ namespace connect4_backend.Data.Models;
 
 public partial class Match
 {
-    public int Id { get; set; }
+    public string Id { get; set; } = "";
 
     public string FirstPlayer { get; set; } = null!;
 

@@ -17,9 +17,9 @@ namespace connect4_backend.Extensions.Configurations
     options => options.UseSqlServer(configuration.GetConnectionString("auth"))
 );
 
-services.AddIdentityApiEndpoints<IdentityUser>()
-    .AddEntityFrameworkStores<AuthDbContext>()
-        .AddDefaultTokenProviders();
+            services.AddIdentityApiEndpoints<IdentityUser>()
+                .AddEntityFrameworkStores<AuthDbContext>()
+                    .AddDefaultTokenProviders();
 
 
             return services;

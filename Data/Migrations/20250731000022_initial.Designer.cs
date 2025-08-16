@@ -12,7 +12,7 @@ using connect4_backend.Data;
 namespace connect4_backend.Data.Migrations
 {
     [DbContext(typeof(Connect4Context))]
-    [Migration("20250720134000_initial")]
+    [Migration("20250731000022_initial")]
     partial class initial
     {
         /// <inheritdoc />
@@ -63,12 +63,9 @@ namespace connect4_backend.Data.Migrations
 
             modelBuilder.Entity("connect4_backend.Data.Models.Match", b =>
                 {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int")
+                    b.Property<string>("Id")
+                        .HasColumnType("nvarchar(450)")
                         .HasColumnName("id");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2")

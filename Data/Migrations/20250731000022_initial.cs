@@ -58,8 +58,7 @@ namespace connect4_backend.Data.Migrations
                 name: "matches",
                 columns: table => new
                 {
-                    id = table.Column<int>(type: "int", nullable: false)
-                        .Annotation("SqlServer:Identity", "1, 1"),
+                    id = table.Column<string>(type: "nvarchar(450)", nullable: false),
                     firstPlayer = table.Column<string>(type: "varchar(50)", unicode: false, maxLength: 50, nullable: false),
                     secondPlayer = table.Column<string>(type: "varchar(50)", unicode: false, maxLength: 50, nullable: false),
                     winner = table.Column<string>(type: "varchar(50)", unicode: false, maxLength: 50, nullable: true),
