@@ -14,7 +14,6 @@ public static class GoogleAuthConfig
             options.DefaultScheme = IdentityConstants.ApplicationScheme;
             options.DefaultSignInScheme = IdentityConstants.ExternalScheme;
         })
-        .AddCookie(IdentityConstants.ExternalScheme)
                 .AddGoogle(options =>
         {
             options.ClientId = configurations["googleAuth:clientId"]!;
